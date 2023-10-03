@@ -72,6 +72,20 @@ jobs:
              ls -al
        - name: Build docker image
          run: sudo docker build -t my-app .
+       - name: Push Docker Image to ECR
+         uses: actions/checkout@v2
+
+       - name: Configure AWS Credentials
+         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+         # AWS_DEFAULT_REGION: your-ecr-region
+         run: |
+          aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+          aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+          aws-region: ${{ env.AWS_REGION }}
+        #  aws configure set default.region $AWS_DEFAULT_REGION
        - name: Setup Trivy
          run: |
            wget https://github.com/aquasecurity/trivy/releases/download/v0.20.1/trivy_0.20.1_Linux-64bit.tar.gz
