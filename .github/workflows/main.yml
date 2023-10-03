@@ -1,0 +1,92 @@
+name: java application1   
+on: 
+  push:
+  pull_request:
+    branches: 
+       - main
+       - feature
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Java version
+        uses: actions/setup-java@v1
+        with:
+          java-version: '11'
+      - name: Build with Maven
+        run: mvn clean install
+      
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v2
+        with:
+          name: java-app
+          path: '${{ github.workspace }}/target/*.jar'
+      - name: Set up JFrog CLI
+        run: |
+          curl -fL https://getcli.jfrog.io | sh
+          mv jfrog /usr/local/bin/jfrog
+          chmod +x /usr/local/bin/jfrog
+      - name: move artifact
+        run: | 
+         jfrog rt mv --url http://3.16.138.185:8082/artifactory --access-token eyJ2ZXIiOiIyIiwidHlwIjoiSldUIiwiYWxnIjoiUlMyNTYiLCJraWQiOiJvXzNUM0gwZmhlV3JLdlhFYkZjenZUeFd3QzNReWg2b2JIMzdiOXBRa0pvIn0.eyJzdWIiOiJqZmFjQDAxaGJnNXZqNzIwbWVtMHAyNXM2N2Ewa2c3L3VzZXJzL2FkbWluIiwic2NwIjoiYXBwbGllZC1wZXJtaXNzaW9ucy9hZG1pbiIsImF1ZCI6IipAKiIsImlzcyI6ImpmZmVAMDFoYmc1dmo3MjBtZW0wcDI1czY3YTBrZzciLCJpYXQiOjE2OTU5ODU5NTMsImp0aSI6ImRlNzk0M2VhLTVjNzItNGI4Ny1iNjEyLTA0ZDRhZWNiZGJiYyJ9.ErjrLucrs-8YFODz61PRSfLKSJhsC2hiOqOl7goUp6oN8sqf48OmoH6VUMhp79xCNSDp6suNjlqfpEft38VsunzIFaDMTfQwiTEKk_weJ5kxsnDr1CEm8vKc3BGcG_om6UX-xwdKUBZ_XELs3PXBFeC7seCcGsz46vWlGRsfb3jQMNTJjslq6OGg2jQ8-1bDChy9WFoXg_t13CjdyXOgam9V2aZFtCaTlBaR5di8dI2lG_NqF0TOwnQMsrerbz8CpiPPkvCVQ4vfUPx_VDdJql26Y0DouJGpgUmlbfw-x8U7b6vDFiEsSqNNFoDcXi8qN5tkcc4hRHyqBOUckv73ig app.jar jar-2/
+
+
+  deploy:
+    name: Deploy to EC2 on master branch push
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+   
+    steps:
+       - name: Checkout the files
+         uses: actions/checkout@v2
+         
+       - name: Download artifact from build job
+         uses: actions/download-artifact@v2
+         with:
+          name: java-app
+          
+       - name: Install rsync 
+         run: sudo apt-get install rsync -y
+
+     #  - name: Rsync Files to Remote Server
+      #   run: |
+       #    rsync -avz --delete ./path/to/local/files/ user@hostname:/path/to/remote/files/
+         
+       - name: Deploy to Server 1
+         uses: easingthemes/ssh-deploy@main
+         env:
+           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+           REMOTE_HOST: ${{ secrets.HOST_DNS }}
+           REMOTE_USER: ${{ secrets.USERNAME }}
+           TARGET: ${{ secrets.TARGET_DIR }}
+           aws-region: ${{ env.AWS_REGION }}
+           ARGS: -r
+           SCRIPT_BEFORE: |
+             whoami
+             ls -al
+       - name: Build docker image
+         run: sudo docker build -t my-app .
+       - name: Setup Trivy
+         run: |
+           wget https://github.com/aquasecurity/trivy/releases/download/v0.20.1/trivy_0.20.1_Linux-64bit.tar.gz
+           tar zxvf trivy_0.20.1_Linux-64bit.tar.gz
+           sudo mv trivy /usr/local/bin/trivy
+           trivy --version
+       - name: Run Trivy Scan
+         run: |
+           trivy image my-app > scanning.txt
+      # trivy image -o json ./home/ubuntu/application > trivy_scan.json
+       #    working-directory: ${{ github.workspace }}
+        
+       - name: Run docker container
+         run: docker run -d -p 8080:8080 --name springboot my-app
+       
+      
+  
+         
