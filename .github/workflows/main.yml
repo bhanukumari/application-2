@@ -69,7 +69,7 @@ jobs:
            ARGS: -r
            SCRIPT_BEFORE: |
              whoami
-             ls -al
+             ls -al 
        - name: Build docker image
          run: sudo docker build -t my-app .
        - name: Setup Trivy
